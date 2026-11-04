@@ -24,6 +24,7 @@ class ProductoBase(BaseModel):
     stock_actual: Decimal = Decimal("0")
     stock_minimo_alerta: Decimal = Decimal("5")
     porcentaje_ganancia: Decimal | None = None
+    iva_porcentaje: Decimal = Decimal("0")
     id_sucursal: int
 
 
@@ -37,6 +38,7 @@ class ProductoUpdate(BaseModel):
     costo_compra: Decimal | None = None
     stock_minimo_alerta: Decimal | None = None
     porcentaje_ganancia: Decimal | None = None
+    iva_porcentaje: Decimal | None = None
     activo: bool | None = None
 
 

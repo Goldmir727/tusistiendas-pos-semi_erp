@@ -29,6 +29,7 @@ class Usuario(Base):
 
     id_usuario: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     nombre_completo: Mapped[str] = mapped_column(String(200))
+    email: Mapped[str] = mapped_column(String(200), unique=True, index=True)
     documento_identidad: Mapped[str] = mapped_column(String(20), unique=True)
     contrasena_hash: Mapped[str] = mapped_column(String(255))
     rol: Mapped[RolEnum] = mapped_column(Enum(RolEnum, name="rol_enum"))

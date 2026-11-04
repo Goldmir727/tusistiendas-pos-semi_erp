@@ -3,11 +3,12 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.exceptions import CashDrawerError, NotFoundError
 from app.models.caja import CajaArqueo, SesionCaja
+from app.models.egreso import Egreso
 from app.schemas.caja import CajaArqueoItem, CierreCaja, SesionCajaCreate
 
 
@@ -59,11 +60,20 @@ async def cerrar_sesion_caja(
         )
         db.add(arqueo)
 
-    efectivo_esperado = sesion.base_inicial + sesion.ventas_efectivo
-    descuadre = float(data.efectivo_declarado) - float(efectivo_esperado)
+    total_egresos = Decimal("0")
+    result_egresos = await db.execute(
+        select(func.coalesce(func.sum(Egreso.monto), 0)).where(
+            Egreso.id_sesion_caja == sesion.id_sesion_caja
+        )
+    )
+    total_egresos = Decimal(str(result_egresos.scalar() or 0))
+
+    efectivo_esperado = (Decimal(str(sesion.base_inicial)) + Decimal(str(sesion.ventas_efectivo))) - total_egresos
+    # El descuadre sale del arqueo contado, no de un valor digitado aparte.
+    descuadre = float(total_contado - efectivo_esperado)
 
     sesion.fecha_cierre = datetime.utcnow()
-    sesion.efectivo_declarado_cierre = data.efectivo_declarado
+    sesion.efectivo_declarado_cierre = float(total_contado)
     sesion.descuadre = descuadre
     sesion.estado = "cerrada"
 

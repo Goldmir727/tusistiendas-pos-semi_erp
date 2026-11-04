@@ -24,14 +24,8 @@ interface Usuario {
   id_sucursal: number | null;
 }
 
-interface Sucursal {
-  id_sucursal: number;
-  nombre: string;
-}
-
 const turnos = ref<Turno[]>([]);
 const usuarios = ref<Usuario[]>([]);
-const sucursales = ref<Sucursal[]>([]);
 const loading = ref(true);
 const currentWeekStart = ref(getMonday(new Date()));
 const showCreateModal = ref(false);
@@ -57,7 +51,6 @@ const HOURS = computed(() => {
   return Array.from({ length: end - start + 1 }, (_, i) => i + start);
 });
 const DAY_NAMES = ["Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom"];
-const FULL_DAY_NAMES = ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"];
 
 function getMonday(d: Date): Date {
   const date = new Date(d);

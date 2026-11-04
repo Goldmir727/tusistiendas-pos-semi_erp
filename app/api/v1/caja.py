@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.exceptions import CashDrawerError, NotFoundError
 from app.models.caja import CajaArqueo, SesionCaja
+from app.models.configuracion import Configuracion
 from app.models.turno import EstadoTurno, TurnoCalendario
 from app.models.usuario import Usuario
 from app.schemas.caja import CajaDoblePanel, CajaArqueoItem, CierreCaja, SesionCajaCreate, SesionCajaRead
@@ -40,15 +41,19 @@ async def abrir_caja(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[Usuario, Depends(get_current_user)],
 ) -> SesionCajaRead:
-    turno_result = await db.execute(
-        select(TurnoCalendario).where(
-            TurnoCalendario.id_usuario_titular == current_user.id_usuario,
-            TurnoCalendario.estado_turno == EstadoTurno.activo,
-        )
+    config_turno = await db.execute(
+        select(Configuracion).where(Configuracion.clave == "caja.requiere_turno_activo")
     )
-    turno = turno_result.scalar_one_or_none()
-    if not turno:
-        raise CashDrawerError("No tiene un turno activo para abrir caja")
+    requiere_turno = (config_turno.scalar_one_or_none() or None)
+    if requiere_turno is not None and requiere_turno.valor == "1":
+        turno_result = await db.execute(
+            select(TurnoCalendario).where(
+                TurnoCalendario.id_usuario_titular == current_user.id_usuario,
+                TurnoCalendario.estado_turno == EstadoTurno.activo,
+            )
+        )
+        if not turno_result.scalar_one_or_none():
+            raise CashDrawerError("No tiene un turno activo para abrir caja")
 
     existing = await db.execute(
         select(SesionCaja).where(

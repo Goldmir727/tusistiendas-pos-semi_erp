@@ -36,6 +36,7 @@ class Producto(Base):
     stock_actual: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     stock_minimo_alerta: Mapped[float] = mapped_column(Numeric(12, 2), default=5)
     porcentaje_ganancia: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
+    iva_porcentaje: Mapped[float] = mapped_column(Numeric(5, 2), default=0)
     activo: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

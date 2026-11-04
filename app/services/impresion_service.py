@@ -106,3 +106,74 @@ def abrir_cajon() -> None:
         raise PrinterError(f"Error al abrir cajón: {e}")
     finally:
         p.close()
+
+
+ANCHO_TIQUETE = 40
+
+
+def construir_lineas_tiquete(
+    negocio: dict[str, Any],
+    venta: dict[str, Any],
+    items: list[dict[str, Any]],
+    pagos: list[dict[str, Any]],
+    copia: str = "CLIENTE",
+) -> list[str]:
+    """Arma el tiquete en texto plano de 40 columnas (ESC/POS y respaldo HTML)."""
+    ancho = ANCHO_TIQUETE
+    lineas: list[str] = [str(negocio.get("nombre") or "TuSisTiendas")[:ancho].center(ancho)]
+    if negocio.get("nit"):
+        lineas.append(f"NIT {negocio['nit']}"[:ancho].center(ancho))
+    if negocio.get("direccion"):
+        lineas.append(str(negocio["direccion"])[:ancho].center(ancho))
+    if negocio.get("telefono"):
+        lineas.append(f"Tel {negocio['telefono']}"[:ancho].center(ancho))
+
+    lineas.append("-" * ancho)
+    lineas.append(f"Tiquete No. {venta['consecutivo']}")
+    lineas.append(f"Fecha: {venta['fecha']}")
+    lineas.append(f"Cajero: {venta['cajero']}")
+    lineas.append(f"Cliente: {venta['cliente']}")
+    lineas.append("-" * ancho)
+
+    for item in items:
+        lineas.append(str(item["nombre"])[:ancho])
+        izquierda = f"  {item['cantidad']:g} x {item['precio']:,.0f}"
+        lineas.append(f"{izquierda:<24}{item['subtotal']:>16,.0f}")
+
+    lineas.append("-" * ancho)
+    lineas.append(f"{'Subtotal':<24}{venta['subtotal']:>16,.0f}")
+    lineas.append(f"{'Impuestos':<24}{venta['impuestos']:>16,.0f}")
+    lineas.append(f"{'TOTAL':<24}{venta['total']:>16,.0f}")
+    lineas.append("-" * ancho)
+
+    for pago in pagos:
+        lineas.append(f"{str(pago['metodo'])[:20]:<24}{pago['monto']:>16,.0f}")
+        if pago.get("vuelto"):
+            lineas.append(f"{'  Cambio':<24}{pago['vuelto']:>16,.0f}")
+
+    lineas.append("-" * ancho)
+    lineas.append(f"UUID {venta['uuid']}"[:ancho])
+    lineas.append(f"*** {copia} ***".center(ancho))
+    lineas.append(str(negocio.get("mensaje") or "Gracias por su compra")[:ancho].center(ancho))
+    return lineas
+
+
+def _imprimir_lineas(lineas: list[str], abrir_caja: bool = False) -> None:
+    p = get_printer()
+    try:
+        if abrir_caja:
+            p.cashdraw(2)
+        for linea in lineas:
+            p.text(linea + "\n")
+        p.text("\n")
+        p.cut()
+    except Exception as e:
+        raise PrinterError(f"Error al imprimir tiquete: {e}")
+    finally:
+        p.close()
+
+
+def imprimir_ticket_doble(lineas_cliente: list[str], lineas_copia: list[str]) -> None:
+    """Doble comprobante: original para el cliente y copia para el negocio (RF-09)."""
+    _imprimir_lineas(lineas_cliente, abrir_caja=True)
+    _imprimir_lineas(lineas_copia)

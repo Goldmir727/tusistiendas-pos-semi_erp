@@ -46,6 +46,10 @@ onMounted(async () => {
         <router-link to="/pos" class="nav-btn card">Abrir POS</router-link>
         <router-link to="/turnos" class="nav-btn card">Mis Turnos</router-link>
         <router-link to="/pagos" class="nav-btn card">Mis Pagos</router-link>
+        <router-link to="/clientes" class="nav-btn card">Clientes y Fiado</router-link>
+        <router-link to="/compras" class="nav-btn card">Compras e Inventario</router-link>
+        <router-link to="/devoluciones" class="nav-btn card">Devoluciones</router-link>
+        <router-link to="/egresos" class="nav-btn card">Egresos</router-link>
         <router-link v-if="authStore.user?.rol === 'administrador'" to="/admin" class="nav-btn card">Admin</router-link>
       </nav>
     </main>

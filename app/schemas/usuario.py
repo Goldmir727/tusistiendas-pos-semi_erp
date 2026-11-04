@@ -9,6 +9,7 @@ from app.models.usuario import RolEnum
 
 class UsuarioBase(BaseModel):
     nombre_completo: str
+    email: str
     documento_identidad: str
     rol: RolEnum
     telefono: str | None = None
@@ -23,6 +24,7 @@ class UsuarioCreate(UsuarioBase):
 
 class UsuarioUpdate(BaseModel):
     nombre_completo: str | None = None
+    email: str | None = None
     telefono: str | None = None
     banco_nombre: str | None = None
     banco_numero_cuenta: str | None = None

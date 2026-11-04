@@ -5,6 +5,7 @@ import api from "../api/client";
 interface User {
   id_usuario: number;
   nombre_completo: string;
+  email: string;
   documento_identidad: string;
   rol: string;
   id_sucursal: number | null;
@@ -17,16 +18,18 @@ export const useAuthStore = defineStore("auth", () => {
 
   const isAuthenticated = computed(() => !!token.value);
 
-  async function login(documentoIdentidad: string, contrasena: string) {
+  async function login(email: string, contrasena: string) {
     const response = await api.post("/auth/login", {
-      documento_identidad: documentoIdentidad,
+      email: email,
       contrasena: contrasena,
     });
 
-    token.value = response.data.access_token;
-    refreshToken.value = response.data.refresh_token;
-    localStorage.setItem("token", token.value);
-    localStorage.setItem("refreshToken", refreshToken.value);
+    const access = response.data.access_token as string;
+    const refresh = response.data.refresh_token as string;
+    token.value = access;
+    refreshToken.value = refresh;
+    localStorage.setItem("token", access);
+    localStorage.setItem("refreshToken", refresh);
 
     await fetchUser();
   }

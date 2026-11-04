@@ -94,6 +94,7 @@ async def create_producto(
         stock_actual=body.stock_actual,
         stock_minimo_alerta=body.stock_minimo_alerta,
         porcentaje_ganancia=body.porcentaje_ganancia,
+        iva_porcentaje=body.iva_porcentaje,
         id_sucursal=body.id_sucursal,
     )
     db.add(producto)

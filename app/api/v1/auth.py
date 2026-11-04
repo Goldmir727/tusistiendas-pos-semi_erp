@@ -14,6 +14,7 @@ from app.database import get_db
 from app.exceptions import AuthenticationError
 from app.models.usuario import SesionUsuario, Usuario
 from app.schemas.auth import LoginRequest, RefreshTokenRequest, TokenPair
+from app.services.auditoria_service import registrar_auditoria
 from app.services.auth_service import (
     create_access_token,
     create_refresh_token,
@@ -56,7 +57,7 @@ async def login(
     ip = request.client.host if request.client else "unknown"
     _check_rate_limit(ip)
 
-    result = await db.execute(select(Usuario).where(Usuario.documento_identidad == body.documento_identidad))
+    result = await db.execute(select(Usuario).where(Usuario.email == body.email))
     user = result.scalar_one_or_none()
 
     if not user or not verify_contrasena(body.contrasena, user.contrasena_hash):
@@ -83,6 +84,15 @@ async def login(
         expira_en=refresh_expires,
     )
     db.add(session)
+
+    await registrar_auditoria(
+        db,
+        "auth.login",
+        f"Inicio de sesión de {user.email}",
+        id_usuario=user.id_usuario,
+        id_sucursal=user.id_sucursal,
+        ip=ip,
+    )
 
     return TokenPair(
         access_token=access_token,

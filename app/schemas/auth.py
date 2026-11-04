@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 
 class LoginRequest(BaseModel):
-    documento_identidad: str
+    email: str
     contrasena: str
 
 

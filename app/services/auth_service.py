@@ -111,6 +111,7 @@ async def get_current_user_optional(authorization: str | None = Header(None)) ->
 async def create_usuario(db: AsyncSession, data: UsuarioCreate) -> Usuario:
     usuario = Usuario(
         nombre_completo=data.nombre_completo,
+        email=data.email,
         documento_identidad=data.documento_identidad,
         contrasena_hash=hash_contrasena(data.contrasena),
         rol=data.rol,

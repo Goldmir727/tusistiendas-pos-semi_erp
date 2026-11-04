@@ -5,7 +5,7 @@ import { useAuthStore } from "../stores/auth";
 
 const authStore = useAuthStore();
 const router = useRouter();
-const documento = ref("");
+const email = ref("");
 const contrasena = ref("");
 const error = ref("");
 const loading = ref(false);
@@ -14,7 +14,7 @@ async function handleLogin() {
   loading.value = true;
   error.value = "";
   try {
-    await authStore.login(documento.value, contrasena.value);
+    await authStore.login(email.value, contrasena.value);
     router.push("/");
   } catch (e: any) {
     error.value = e.response?.data?.error?.message || "Error de autenticacion";
@@ -31,8 +31,8 @@ async function handleLogin() {
       <p class="subtitle">Inicia sesion para continuar</p>
       <form @submit.prevent="handleLogin">
         <div class="field">
-          <label>Documento</label>
-          <input v-model="documento" type="text" placeholder="Numero de documento" required />
+          <label>Email</label>
+          <input v-model="email" type="email" placeholder="correo@ejemplo.com" required />
         </div>
         <div class="field">
           <label>Contrasena</label>

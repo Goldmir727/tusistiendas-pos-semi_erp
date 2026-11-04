@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime
+from uuid import UUID, uuid4
 
 from sqlalchemy import (
     DateTime,
@@ -11,6 +12,8 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
+    Uuid,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -21,15 +24,28 @@ class EstadoVenta(str, enum.Enum):
     pendiente = "pendiente"
     pagada = "pagada"
     anulada = "anulada"
-    contigencia = "contingencia"
+    contingencia = "contingencia"
 
 
 class MetodoPago(str, enum.Enum):
     efectivo = "efectivo"
+    transferencia = "transferencia"
+    datafono = "datafono"
+    fiado = "fiado"
+    # Valores heredados: se conservan para poder leer filas antiguas.
+    # No se ofrecen en la interfaz ni se aceptan en ventas nuevas.
     tarjeta = "tarjeta"
     nequi = "nequi"
     daviplata = "daviplata"
     pse = "pse"
+
+
+MEDIOS_PAGO_VIGENTES = (
+    MetodoPago.efectivo,
+    MetodoPago.transferencia,
+    MetodoPago.datafono,
+    MetodoPago.fiado,
+)
 
 
 class MedioPago(Base):
@@ -46,8 +62,13 @@ class MedioPago(Base):
 
 class Venta(Base):
     __tablename__ = "ventas"
+    __table_args__ = (
+        UniqueConstraint("id_sucursal", "consecutivo", name="uq_ventas_sucursal_consecutivo"),
+    )
 
     id_venta: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    uuid: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), default=uuid4, unique=True, index=True)
+    consecutivo: Mapped[int] = mapped_column(Integer)
     id_sesion_caja: Mapped[int] = mapped_column(Integer, ForeignKey("sesiones_caja.id_sesion_caja"), index=True)
     id_usuario: Mapped[int] = mapped_column(Integer, ForeignKey("usuarios.id_usuario"))
     id_cliente: Mapped[int | None] = mapped_column(Integer, ForeignKey("clientes.id_cliente"))
@@ -58,8 +79,14 @@ class Venta(Base):
     total: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     estado: Mapped[EstadoVenta] = mapped_column(Enum(EstadoVenta, name="estado_venta_enum"), default=EstadoVenta.pendiente)
     observacion: Mapped[str | None] = mapped_column(Text)
+    es_fiado: Mapped[bool] = mapped_column(default=False)
+    monto_abonado: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    monto_devuelto: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    origen: Mapped[str] = mapped_column(String(20), default="online")
+    creado_offline_en: Mapped[datetime | None] = mapped_column(DateTime)
 
     id_sucursal: Mapped[int] = mapped_column(Integer, ForeignKey("sucursales.id_sucursal"), index=True)
+    id_punto_venta: Mapped[int | None] = mapped_column(Integer, ForeignKey("puntos_venta.id_punto_venta"))
 
     detalles: Mapped[list[VentaDetalle]] = relationship(back_populates="venta", cascade="all, delete-orphan")
     pagos: Mapped[list[VentaPago]] = relationship(back_populates="venta", cascade="all, delete-orphan")
@@ -75,7 +102,7 @@ class VentaDetalle(Base):
     cantidad: Mapped[float] = mapped_column(Numeric(12, 2))
     precio_unitario: Mapped[float] = mapped_column(Numeric(12, 2))
     descuento: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
-    iva_porcentaje: Mapped[float] = mapped_column(Numeric(5, 2), default=19.0)
+    iva_porcentaje: Mapped[float] = mapped_column(Numeric(5, 2), default=0)
     subtotal: Mapped[float] = mapped_column(Numeric(12, 2))
 
     venta: Mapped[Venta] = relationship(back_populates="detalles")
@@ -89,6 +116,7 @@ class VentaPago(Base):
     id_venta: Mapped[int] = mapped_column(Integer, ForeignKey("ventas.id_venta"), index=True)
     id_medio_pago: Mapped[int] = mapped_column(Integer, ForeignKey("medios_pago.id_medio_pago"))
     monto: Mapped[float] = mapped_column(Numeric(12, 2))
+    vuelto: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     referencia_manual: Mapped[str | None] = mapped_column(String(100))
     fecha_pago: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
