@@ -216,7 +216,51 @@
   }
 }
 
-/* Calendario mensual ------------------------------------------------------- */
+/* Filtro de sucursal del calendario --------------------------------------- */
+
+.branch-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.branch-bar > label {
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.branch-bar select {
+  min-width: 200px;
+  padding: 7px 10px;
+  border-radius: 7px;
+  font-size: 13px;
+}
+
+.branch-label {
+  color: var(--text);
+  font-weight: 600;
+}
+
+@media (max-width: 760px) {
+  .branch-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .branch-bar select {
+    width: 100%;
+  }
+}
 
 .month-section {
   position: relative;

@@ -189,6 +189,7 @@ const pincel = ref({
   hora_inicio: "07:00",
   hora_fin: "15:00",
 });
+const mesFiltroSucursal = ref<number | null>(null);
 const pincelFiltroSucursal = ref<number | null>(null);
 
 // ---------------------------------------------------------------------------
@@ -488,7 +489,10 @@ const navLabel = computed(() =>
 const subtitulo = computed(() => {
   if (vista.value === "mes") {
     const n = empleadosConTurnos.value;
-    return `${totalMes.value} turnos · ${n} ${n === 1 ? "empleado" : "empleados"} con agenda`;
+    const suc = mesFiltroSucursal.value
+      ? ` · ${nombreSucursal(mesFiltroSucursal.value)}`
+      : "";
+    return `${totalMes.value} turnos · ${n} ${n === 1 ? "empleado" : "empleados"} con agenda${suc}`;
   }
   if (vista.value === "pintar") {
     const n = empleadosPintar.value.length;
@@ -567,9 +571,12 @@ async function fetchMes(): Promise<void> {
   try {
     const inicio = startOfWeek(startOfMonth(mesActual.value));
     const fin = addDays(inicio, 41);
-    const response = await api.get("/turnos/calendario", {
-      params: { fecha_desde: toISODate(inicio), fecha_hasta: toISODate(fin) },
-    });
+    const params: Record<string, any> = {
+      fecha_desde: toISODate(inicio),
+      fecha_hasta: toISODate(fin),
+    };
+    if (mesFiltroSucursal.value) params.id_sucursal = mesFiltroSucursal.value;
+    const response = await api.get("/turnos/calendario", { params });
     turnosMes.value = response.data.turnos || [];
     festivosMes.value = response.data.festivos || [];
   } catch (error: any) {
@@ -583,12 +590,12 @@ async function fetchPintar(): Promise<void> {
   if (!esAdmin.value) return;
   loadingPintar.value = true;
   try {
-    const response = await api.get("/turnos/calendario", {
-      params: {
-        fecha_desde: toISODate(diasPintar.value[0]),
-        fecha_hasta: toISODate(diasPintar.value[6]),
-      },
-    });
+    const params: Record<string, any> = {
+      fecha_desde: toISODate(diasPintar.value[0]),
+      fecha_hasta: toISODate(diasPintar.value[6]),
+    };
+    if (pincelFiltroSucursal.value) params.id_sucursal = pincelFiltroSucursal.value;
+    const response = await api.get("/turnos/calendario", { params });
     turnosPintar.value = response.data.turnos || [];
     festivosPintar.value = response.data.festivos || [];
   } catch (error: any) {
@@ -1139,6 +1146,10 @@ watch(mesActual, () => {
   void fetchMes();
 });
 
+watch(mesFiltroSucursal, () => {
+  void fetchMes();
+});
+
 watch(pintarSemana, () => {
   if (esAdmin.value) void fetchPintar();
 });
@@ -1151,18 +1162,17 @@ watch(vista, (nueva) => {
 });
 
 onMounted(async () => {
+  await fetchSucursales();
   if (esAdmin.value) {
-    await Promise.all([
-      fetchEmpleados(),
-      fetchSucursales(),
-      fetchTarifas(),
-      fetchPlantillas(),
-    ]);
+    await Promise.all([fetchEmpleados(), fetchTarifas(), fetchPlantillas()]);
     const sucursalBase =
       authStore.user?.id_sucursal || sucursales.value[0]?.id_sucursal || null;
     turnoForm.value.id_sucursal = sucursalBase || 0;
     plantillaForm.value.id_sucursal = sucursalBase || 0;
+    mesFiltroSucursal.value = sucursalBase;
     await fetchPintar();
+  } else {
+    mesFiltroSucursal.value = authStore.user?.id_sucursal || null;
   }
   await fetchMes();
 });
@@ -1200,6 +1210,19 @@ onMounted(async () => {
 
   <section v-if="vista === 'mes'" class="month-section">
     <div v-if="loading" class="loading-pill">Cargando...</div>
+
+    <div class="branch-bar">
+      <label>Sucursal:</label>
+      <select v-if="esAdmin" v-model="mesFiltroSucursal">
+        <option :value="0">Todas las sucursales</option>
+        <option v-for="s in sucursales" :key="s.id_sucursal" :value="s.id_sucursal">
+          {{ s.nombre }}
+        </option>
+      </select>
+      <span v-else class="branch-label">
+        {{ mesFiltroSucursal ? nombreSucursal(mesFiltroSucursal) : 'Mi sucursal' }}
+      </span>
+    </div>
 
     <div class="month-desktop">
       <div class="month-head">

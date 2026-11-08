@@ -364,7 +364,7 @@ async def get_calendario(
 @router.get("/sucursales", response_model=None)
 async def list_sucursales(
     db: Annotated[AsyncSession, Depends(get_db)],
-    _current: Annotated[Usuario, Depends(get_current_admin)],
+    _current: Annotated[Usuario, Depends(get_current_user)],
 ) -> list[dict]:
     result = await db.execute(select(Sucursal).where(Sucursal.activa == True))  # noqa: E712
     return [
