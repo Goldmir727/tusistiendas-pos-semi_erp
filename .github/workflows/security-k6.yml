@@ -1,0 +1,89 @@
+name: Security (k6)
+
+on:
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: "3.11"
+  BASE_URL: "http://localhost:8000"
+
+jobs:
+  k6-security:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: pos_db_test
+          POSTGRES_USER: pos_user
+          POSTGRES_PASSWORD: test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Seed database (idempotent)
+        env:
+          DATABASE_URL: postgresql+asyncpg://pos_user:test_password@localhost:5432/pos_db_test
+          REDIS_URL: redis://localhost:6379/0
+          JWT_SECRET_KEY: test-secret-key-for-ci
+          APP_ENV: test
+          AUTH_2FA_ENABLED: "false"
+        run: python scripts/seed.py
+
+      - name: Start API
+        env:
+          DATABASE_URL: postgresql+asyncpg://pos_user:test_password@localhost:5432/pos_db_test
+          REDIS_URL: redis://localhost:6379/0
+          JWT_SECRET_KEY: test-secret-key-for-ci
+          APP_ENV: test
+          AUTH_2FA_ENABLED: "false"
+          APP_DEBUG: "false"
+        run: |
+          uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8000/health && break
+            sleep 1
+          done
+
+      - name: Install k6
+        run: |
+          sudo gpg -k
+          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install k6
+
+      - name: Run k6 - auth_bruteforce
+        run: k6 run -e BASE_URL=${{ env.BASE_URL }} k6/auth_bruteforce.js
+
+      - name: Run k6 - rbac_idor
+        run: k6 run -e BASE_URL=${{ env.BASE_URL }} k6/rbac_idor.js
+
+      - name: Run k6 - injection
+        run: k6 run -e BASE_URL=${{ env.BASE_URL }} k6/injection.js
+
+      - name: Run k6 - headers_cors
+        run: k6 run -e BASE_URL=${{ env.BASE_URL }} k6/headers_cors.js
+
+      - name: Run k6 - pos_caja
+        run: k6 run -e BASE_URL=${{ env.BASE_URL }} k6/pos_caja.js
