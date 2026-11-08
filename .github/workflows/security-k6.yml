@@ -73,9 +73,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install k6
 
-      - name: Run k6 - auth_bruteforce
-        run: k6 run -e BASE_URL=${{ env.BASE_URL }} k6/auth_bruteforce.js
-
       - name: Run k6 - rbac_idor
         run: k6 run -e BASE_URL=${{ env.BASE_URL }} k6/rbac_idor.js
 
@@ -87,3 +84,6 @@ jobs:
 
       - name: Run k6 - pos_caja
         run: k6 run -e BASE_URL=${{ env.BASE_URL }} k6/pos_caja.js
+
+      - name: Run k6 - auth_bruteforce
+        run: k6 run -e BASE_URL=${{ env.BASE_URL }} k6/auth_bruteforce.js

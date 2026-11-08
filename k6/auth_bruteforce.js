@@ -3,11 +3,15 @@
 //
 // Ejecutar:
 //   k6 run -e BASE_URL=http://localhost:8000 k6/auth_bruteforce.js
+//
+// Nota: el escenario brute_force bloquea la IP por rate-limit durante 5 min.
+// Ejecutar este script AL FINAL de la suite, o reiniciar el API entre runs.
 
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { API } from './lib/config.js';
-import { login, loginAs, tamperToken } from './lib/auth.js';
+import { login, tamperToken } from './lib/auth.js';
+import { USERS } from './lib/config.js';
 
 export const options = {
   scenarios: {
@@ -32,6 +36,14 @@ export const options = {
   },
 };
 
+export function setup() {
+  const admin = login(USERS.admin.email, USERS.admin.password);
+  if (!admin.token) {
+    throw new Error('No se pudo obtener token de admin en setup()');
+  }
+  return { adminToken: admin.token };
+}
+
 export function bruteForce() {
   const email = Math.random() < 0.5 ? 'admin@pos.com' : 'noexiste@pos.com';
   const res = http.post(
@@ -52,9 +64,8 @@ export function bruteForce() {
   sleep(0.05);
 }
 
-export function tokenTampering() {
-  const token = loginAs('admin');
-  if (!token) return;
+export function tokenTampering(data) {
+  const token = data.adminToken;
 
   const tampered = tamperToken(token);
   const res = http.get(`${API}/turnos/calendario?fecha_desde=2026-11-01&fecha_hasta=2026-11-07`, {

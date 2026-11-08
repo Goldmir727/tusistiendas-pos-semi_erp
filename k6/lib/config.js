@@ -26,7 +26,7 @@ export const USERS = {
     password: __ENV.EMPLEADO_PASSWORD || 'empleado123',
   },
   cajero: {
-    email: __ENV.CAJERO_EMAIL || 'cajero01@pos.com',
+    email: __ENV.CAJERO_EMAIL || 'cajero@pos.com',
     password: __ENV.CAJERO_PASSWORD || 'cajero123',
   },
 };
