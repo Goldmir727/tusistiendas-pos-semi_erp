@@ -68,7 +68,12 @@ Cada script define `thresholds`. El pipeline de CI falla si:
 - Algún request produce `5xx`.
 - Un check de seguridad no se cumple (ej. token alterado no da 401, IDOR filtra datos, SQLi produce 5xx).
 
-## Lo que NO cubre k6
+## Orden de ejecución recomendado
+
+`auth_bruteforce.js` bloquea la IP por 5 minutos tras 5 intentos fallidos.
+Ejecutarlo **al final** (el workflow de CI ya lo hace así). Para runs locales,
+reiniciar el API entre ejecuciones si se necesita volver a loguearse:
+`docker compose restart api`.
 
 - Escaneo automático de vulnerabilidades (usar OWASP ZAP / nuclei).
 - Auditoría de dependencias (`pip-audit`, `npm audit`).
