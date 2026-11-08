@@ -53,7 +53,7 @@ target-version = "py311"
 line-length = 100
 select = ["E", "F", "I", "UP", "W", "C4", "C90", "B", "SIM", "T10", "T20", "ARG", "PTH", "ERA", "PD", "PL", "TRY", "NPY", "RSE", "RET", "FLY", "PIE"]
 ignore = ["S101", "TRY003", "ARG001", "ARG002"]
-per-file-ignores = {"tests/*": ["S101", "TRY003", "ARG001", "ARG002"]}
+per-file-ignores = {"tests/*" = ["S101", "TRY003", "ARG001", "ARG002"]}
 
 [tool.ruff.format]
 quote-style = "double"
