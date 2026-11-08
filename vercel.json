@@ -12,9 +12,45 @@
   },
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/api/(.*)",
       "destination": {
         "service": "app"
+      }
+    },
+    {
+      "source": "/health",
+      "destination": {
+        "service": "app"
+      }
+    },
+    {
+      "source": "/healthz",
+      "destination": {
+        "service": "app"
+      }
+    },
+    {
+      "source": "/docs",
+      "destination": {
+        "service": "app"
+      }
+    },
+    {
+      "source": "/redoc",
+      "destination": {
+        "service": "app"
+      }
+    },
+    {
+      "source": "/openapi.json",
+      "destination": {
+        "service": "app"
+      }
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "pwa"
       }
     }
   ]
