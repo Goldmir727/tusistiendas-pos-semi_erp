@@ -12,6 +12,7 @@ class SesionCajaCreate(BaseModel):
     base_inicial: Decimal
     id_sucursal: int
     id_punto_venta: int
+    id_usuario_abre_caja: int | None = None
 
 
 class CajaArqueoItem(BaseModel):
@@ -20,7 +21,8 @@ class CajaArqueoItem(BaseModel):
 
 
 class CierreCaja(BaseModel):
-    efectivo_declarado: Decimal
+    # El valor contado sale del arqueo; el campo se acepta por compatibilidad.
+    efectivo_declarado: Decimal | None = None
     arqueo: list[CajaArqueoItem]
 
 
@@ -28,12 +30,16 @@ class SesionCajaRead(BaseModel):
     id_sesion_caja: int
     id_usuario_creador: int
     id_usuario_reemplazo: int | None = None
+    id_usuario_abre_caja: int | None = None
     fecha_apertura: datetime
     fecha_cierre: datetime | None = None
     base_inicial: Decimal
     ventas_efectivo: Decimal
     ventas_digitales: Decimal
     total_tarjeta: Decimal
+    abonos_efectivo: Decimal = Decimal("0")
+    devoluciones_efectivo: Decimal = Decimal("0")
+    total_egresos: Decimal = Decimal("0")
     efectivo_declarado_cierre: Decimal | None = None
     descuadre: Decimal | None = None
     estado: EstadoCaja
@@ -48,6 +54,9 @@ class CajaDoblePanel(BaseModel):
     efectivo_real_esperado: Decimal
     base_inicial: Decimal
     ventas_efectivo_acumulado: Decimal
+    abonos_efectivo: Decimal = Decimal("0")
+    devoluciones_efectivo: Decimal = Decimal("0")
+    egresos: Decimal = Decimal("0")
 
 
 class CorteDiarioRead(BaseModel):

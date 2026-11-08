@@ -8,14 +8,20 @@ const loading = ref(true);
 const cuentaAbierta = ref<any | null>(null);
 const abonoVenta = ref<number | null>(null);
 const abonoMonto = ref(0);
+const metodoAbono = ref("efectivo");
+const sesionCaja = ref<any | null>(null);
 const mostrarNuevo = ref(false);
 const nuevo = ref({ nombre: "", numero_doc: "", tipo_doc: "CC", telefono: "", email: "", direccion: "", regimen_fiscal: "" });
 
 async function cargar() {
   loading.value = true;
   try {
-    const response = await api.get("/clientes", { params: { q: q.value || undefined, page_size: 100 } });
+    const [response, caja] = await Promise.all([
+      api.get("/clientes/", { params: { q: q.value || undefined, page_size: 100 } }),
+      api.get("/caja/abierta"),
+    ]);
     clientes.value = response.data.items;
+    sesionCaja.value = caja.data;
   } finally {
     loading.value = false;
   }
@@ -23,7 +29,7 @@ async function cargar() {
 
 async function crearCliente() {
   try {
-    await api.post("/clientes", nuevo.value);
+    await api.post("/clientes/", nuevo.value);
     mostrarNuevo.value = false;
     nuevo.value = { nombre: "", numero_doc: "", tipo_doc: "CC", telefono: "", email: "", direccion: "", regimen_fiscal: "" };
     await cargar();
@@ -46,6 +52,9 @@ async function registrarAbono() {
       id_cliente: cuentaAbierta.value.id_cliente,
       id_venta: abonoVenta.value || null,
       monto: abonoMonto.value,
+      metodo: metodoAbono.value,
+      id_sesion_caja:
+        metodoAbono.value === "efectivo" ? sesionCaja.value?.id_sesion_caja ?? null : null,
     });
     abonoMonto.value = 0;
     abonoVenta.value = null;
@@ -149,6 +158,10 @@ onMounted(cargar);
         <h4>Registrar abono</h4>
         <div class="abono-bar">
           <input v-model.number="abonoMonto" type="number" placeholder="Monto" />
+          <select v-model="metodoAbono" class="metodo">
+            <option value="efectivo">Efectivo</option>
+            <option value="transferencia">Transferencia</option>
+          </select>
           <button @click="registrarAbono" class="primary">Abonar</button>
         </div>
         <h4>Abonos historicos</h4>
@@ -185,5 +198,6 @@ onMounted(cargar);
 .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
 .fila-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); }
 .abono-bar { display: flex; gap: 8px; margin: 8px 0; }
+.metodo { max-width: 150px; }
 .saldo-grande { font-size: 18px; }
 </style>

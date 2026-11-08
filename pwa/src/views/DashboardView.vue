@@ -11,6 +11,7 @@ const stats = ref({
 });
 
 onMounted(async () => {
+  if (authStore.user?.rol !== "administrador") return;
   try {
     const [ventas, stock] = await Promise.all([
       api.get("/reportes/ventas-por-dia", { params: { fecha_desde: new Date().toISOString().split("T")[0], fecha_hasta: new Date().toISOString().split("T")[0] } }),
@@ -42,14 +43,21 @@ onMounted(async () => {
           <span class="stat-value warning">{{ stats.productosBajoStock }}</span>
         </div>
       </div>
+      <div v-if="!authStore.user?.auth_2fa_habilitado" class="card" style="margin-bottom: 16px; border-color: var(--danger);">
+        <strong>Activa la verificacion en dos pasos (2FA)</strong>
+        <p class="muted" style="margin: 4px 0 8px;">Tu cuenta aun no tiene 2FA. Protege el acceso desde dispositivos nuevos.</p>
+        <router-link to="/seguridad" class="btn-back">Ir a Seguridad</router-link>
+      </div>
       <nav class="quick-nav">
-        <router-link to="/pos" class="nav-btn card">Abrir POS</router-link>
+        <router-link v-if="authStore.user?.rol === 'cajero'" to="/pos" class="nav-btn card">Abrir POS</router-link>
+        <router-link v-if="authStore.user?.rol !== 'empleado'" to="/caja" class="nav-btn card">Caja</router-link>
         <router-link to="/turnos" class="nav-btn card">Mis Turnos</router-link>
         <router-link to="/pagos" class="nav-btn card">Mis Pagos</router-link>
-        <router-link to="/clientes" class="nav-btn card">Clientes y Fiado</router-link>
-        <router-link to="/compras" class="nav-btn card">Compras e Inventario</router-link>
-        <router-link to="/devoluciones" class="nav-btn card">Devoluciones</router-link>
-        <router-link to="/egresos" class="nav-btn card">Egresos</router-link>
+        <router-link to="/seguridad" class="nav-btn card">Seguridad</router-link>
+        <router-link v-if="authStore.user?.rol !== 'empleado'" to="/clientes" class="nav-btn card">Clientes y Fiado</router-link>
+        <router-link v-if="authStore.user?.rol !== 'empleado'" to="/compras" class="nav-btn card">Compras e Inventario</router-link>
+        <router-link v-if="authStore.user?.rol !== 'empleado'" to="/devoluciones" class="nav-btn card">Devoluciones</router-link>
+        <router-link v-if="authStore.user?.rol !== 'empleado'" to="/egresos" class="nav-btn card">Egresos</router-link>
         <router-link v-if="authStore.user?.rol === 'administrador'" to="/admin" class="nav-btn card">Admin</router-link>
       </nav>
     </main>

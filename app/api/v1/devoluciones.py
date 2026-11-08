@@ -6,8 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.exceptions import NotFoundError
-from app.models.devolucion import Devolucion, DevolucionDetalle, EstadoDevolucion
+from app.models.devolucion import Devolucion
 from app.models.usuario import Usuario
 from app.schemas.common import MessageResponse
 from app.schemas.devolucion import DevolucionCreate, DevolucionRead
@@ -15,6 +14,39 @@ from app.services.auth_service import get_current_admin, get_current_user
 from app.services.devolucion_service import aprobar_devolucion, crear_devolucion, rechazar_devolucion
 
 router = APIRouter()
+
+
+def _a_read(devolucion: Devolucion) -> DevolucionRead:
+    return DevolucionRead(
+        id_devolucion=devolucion.id_devolucion,
+        id_venta=devolucion.id_venta,
+        id_usuario_solicita=devolucion.id_usuario_solicita,
+        id_usuario_aprueba=devolucion.id_usuario_aprueba,
+        motivo=devolucion.motivo,
+        monto=devolucion.monto,
+        metodo_reembolso=devolucion.metodo_reembolso,
+        estado=devolucion.estado,
+        fecha=devolucion.fecha,
+        detalles=[
+            {
+                "id_producto": det.id_producto,
+                "cantidad": float(det.cantidad),
+                "precio_unitario": float(det.precio_unitario),
+                "iva_porcentaje": float(det.iva_porcentaje),
+                "subtotal": float(det.subtotal),
+            }
+            for det in devolucion.detalles
+        ],
+    )
+
+
+async def _cargar(db: AsyncSession, id_devolucion: int) -> Devolucion:
+    result = await db.execute(
+        select(Devolucion)
+        .options(selectinload(Devolucion.detalles))
+        .where(Devolucion.id_devolucion == id_devolucion)
+    )
+    return result.scalar_one()
 
 
 @router.get("/", response_model=None)
@@ -27,20 +59,7 @@ async def list_devoluciones(
         .options(selectinload(Devolucion.detalles))
         .order_by(Devolucion.fecha.desc())
     )
-    devoluciones = result.scalars().unique().all()
-    items = []
-    for d in devoluciones:
-        data = DevolucionRead.model_validate(d)
-        data.detalles = [
-            {
-                "id_producto": de.id_producto,
-                "cantidad": float(de.cantidad),
-                "precio_unitario": float(de.precio_unitario),
-            }
-            for de in d.detalles
-        ]
-        items.append(data)
-    return items
+    return [_a_read(d) for d in result.scalars().unique().all()]
 
 
 @router.post("/", response_model=None, status_code=201)
@@ -50,22 +69,7 @@ async def create_devolucion(
     current_user: Annotated[Usuario, Depends(get_current_user)],
 ) -> DevolucionRead:
     devolucion = await crear_devolucion(db, body, current_user)
-    result = await db.execute(
-        select(Devolucion)
-        .where(Devolucion.id_devolucion == devolucion.id_devolucion)
-        .options(selectinload(Devolucion.detalles))
-    )
-    devolucion = result.scalar_one()
-    data = DevolucionRead.model_validate(devolucion)
-    data.detalles = [
-        {
-            "id_producto": de.id_producto,
-            "cantidad": float(de.cantidad),
-            "precio_unitario": float(de.precio_unitario),
-        }
-        for de in devolucion.detalles
-    ]
-    return data
+    return _a_read(await _cargar(db, devolucion.id_devolucion))
 
 
 @router.post("/{id_devolucion}/aprobar", response_model=None)
@@ -75,7 +79,7 @@ async def aprobar(
     admin: Annotated[Usuario, Depends(get_current_admin)],
 ) -> DevolucionRead:
     devolucion = await aprobar_devolucion(db, id_devolucion, admin)
-    return DevolucionRead.model_validate(devolucion)
+    return _a_read(await _cargar(db, devolucion.id_devolucion))
 
 
 @router.post("/{id_devolucion}/rechazar", response_model=None)

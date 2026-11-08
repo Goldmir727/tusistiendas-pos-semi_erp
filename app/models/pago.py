@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, Numeric, String
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -26,6 +26,8 @@ class PagoSueldo(Base):
     )
     monto_total: Mapped[float] = mapped_column(Numeric(12, 2))
     observacion: Mapped[str | None] = mapped_column(String(500))
+    recibido_empleado: Mapped[bool] = mapped_column(Boolean, default=False)
+    fecha_recibido: Mapped[datetime | None] = mapped_column(DateTime)
 
     detalles: Mapped[list[PagoTurnoDetalle]] = relationship(back_populates="pago", cascade="all, delete-orphan")
     receptor: Mapped["Usuario"] = relationship(foreign_keys=[id_usuario_receptor])

@@ -19,8 +19,10 @@ export interface VentaTemporal {
   items: ItemCarrito[];
   id_cliente: number | null;
   cliente_nombre: string | null;
+  descripcion?: string | null;
   creado_en: string;
   actualizado_en: string;
+  id_usuario_creador?: number;
 }
 
 export interface MedioPago {
@@ -41,6 +43,7 @@ export interface PagoLinea {
 export interface SesionCaja {
   id_sesion_caja: number;
   id_punto_venta: number;
+  id_usuario_abre_caja?: number | null;
   base_inicial: number;
   estado: string;
 }
@@ -192,7 +195,15 @@ export const usePOSStore = defineStore("pos", () => {
     window.clearTimeout(temporizadorBorrador);
     temporizadorBorrador = window.setTimeout(async () => {
       if (carrito.value.length > 0 || idCliente.value) {
-        await dbLocal.put("estado", { carrito: carrito.value, idCliente: idCliente.value, clienteNombre: clienteNombre.value, temporalActivo: temporalActivo.value }, "borrador");
+        const borrador = JSON.parse(
+          JSON.stringify({
+            carrito: carrito.value,
+            idCliente: idCliente.value,
+            clienteNombre: clienteNombre.value,
+            temporalActivo: temporalActivo.value,
+          }),
+        );
+        await dbLocal.put("estado", borrador, "borrador");
       } else {
         await dbLocal.eliminar("estado", "borrador");
       }
@@ -214,7 +225,7 @@ export const usePOSStore = defineStore("pos", () => {
       let pagina = 1;
       let paginas = 1;
       do {
-        const respuesta = await api.get("/productos", { params: { page: pagina, page_size: 100 } });
+        const respuesta = await api.get("/productos/", { params: { page: pagina, page_size: 100 } });
         for (const producto of respuesta.data.items as ProductoPOS[]) {
           await guardarEnCatalogo(producto);
         }
@@ -240,6 +251,7 @@ export const usePOSStore = defineStore("pos", () => {
     try {
       const respuesta = await api.get("/caja/abierta");
       sesionCaja.value = respuesta.data && respuesta.data.id_sesion_caja ? (respuesta.data as SesionCaja) : null;
+      await cargarTemporalesBackend();
     } catch {
       sesionCaja.value = sesionCaja.value;
     }
@@ -249,21 +261,16 @@ export const usePOSStore = defineStore("pos", () => {
     try {
       const respuesta = await api.get("/ventas/medios");
       medios.value = respuesta.data as MedioPago[];
-      await dbLocal.put("estado", medios.value, "medios");
+      try {
+        // IndexedDB no puede clonar proxies reactivos: guardar una copia plana.
+        await dbLocal.put("estado", JSON.parse(JSON.stringify(medios.value)), "medios");
+      } catch {
+        // Si falla la caché, conservar los medios cargados desde el backend.
+      }
     } catch {
       const guardados = await dbLocal.get<MedioPago[]>("estado", "medios");
       medios.value = guardados ?? [];
     }
-  }
-
-  async function abrirCaja(baseInicial: number, idSucursal: number) {
-    const respuesta = await api.post("/caja/abrir", {
-      base_inicial: baseInicial,
-      id_sucursal: idSucursal,
-      id_punto_venta: idPuntoVenta.value,
-    });
-    sesionCaja.value = respuesta.data as SesionCaja;
-    return sesionCaja.value;
   }
 
   async function iniciar() {
@@ -302,20 +309,71 @@ export const usePOSStore = defineStore("pos", () => {
     }
   }
 
+  function mapTemporalBackend(data: any): VentaTemporal {
+    return {
+      id: String(data.id_venta_temporal),
+      nombre: data.nombre,
+      items: (data.items || []) as ItemCarrito[],
+      id_cliente: data.id_cliente ?? null,
+      cliente_nombre: data.cliente_nombre ?? null,
+      descripcion: data.descripcion ?? null,
+      creado_en: data.created_at,
+      actualizado_en: data.updated_at,
+      id_usuario_creador: data.id_usuario_creador,
+    };
+  }
+
+  async function cargarTemporalesBackend() {
+    if (!online.value || !sesionCaja.value) return;
+    try {
+      const resp = await api.get("/ventas-temporales/", {
+        params: { id_sesion_caja: sesionCaja.value.id_sesion_caja },
+      });
+      temporales.value = (resp.data || [])
+        .map(mapTemporalBackend)
+        .sort((a: VentaTemporal, b: VentaTemporal) =>
+          a.actualizado_en < b.actualizado_en ? 1 : -1
+        );
+    } catch {}
+  }
+
   function nombreSugerido(): string {
     const hora = new Date().toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
     return `Venta ${hora}`;
   }
 
-  async function guardarTemporal(nombre?: string): Promise<VentaTemporal | null> {
+  async function guardarTemporal(nombre?: string, descripcion?: string | null): Promise<VentaTemporal | null> {
     if (carrito.value.length === 0) return null;
+
+    const items = JSON.parse(JSON.stringify(carrito.value)) as ItemCarrito[];
+
+    if (online.value && sesionCaja.value) {
+      try {
+        const resp = await api.post("/ventas-temporales/", {
+          id_sesion_caja: sesionCaja.value.id_sesion_caja,
+          nombre: nombre?.trim() || nombreSugerido(),
+          id_cliente: idCliente.value,
+          cliente_nombre: clienteNombre.value,
+          items,
+          descripcion: descripcion ?? null,
+        });
+        const temporal = mapTemporalBackend(resp.data);
+        temporales.value = [temporal, ...temporales.value.filter((t) => t.id !== temporal.id)];
+        await dbLocal.put("temporales", temporal);
+        limpiarVenta();
+        return temporal;
+      } catch {
+        // Fallback local si falla el backend.
+      }
+    }
 
     const temporal: VentaTemporal = {
       id: temporalActivo.value ?? generarUuid(),
       nombre: nombre?.trim() || nombreSugerido(),
-      items: JSON.parse(JSON.stringify(carrito.value)),
+      items,
       id_cliente: idCliente.value,
       cliente_nombre: clienteNombre.value,
+      descripcion: descripcion ?? null,
       creado_en: ahora(),
       actualizado_en: ahora(),
     };
@@ -328,22 +386,52 @@ export const usePOSStore = defineStore("pos", () => {
     return temporal;
   }
 
+  async function actualizarTemporal(id: string, descripcion: string | null) {
+    if (online.value) {
+      try {
+        const resp = await api.patch(`/ventas-temporales/${id}`, { descripcion });
+        const actualizado = mapTemporalBackend(resp.data);
+        temporales.value = temporales.value.map((t) => (t.id === id ? actualizado : t));
+        await dbLocal.put("temporales", actualizado);
+      } catch (e: any) {
+        alert(e.response?.data?.error?.message || "No se pudo actualizar la descripción");
+      }
+    } else {
+      const temporal = temporales.value.find((t) => t.id === id);
+      if (temporal) {
+        temporal.descripcion = descripcion;
+        temporal.actualizado_en = ahora();
+        await dbLocal.put("temporales", JSON.parse(JSON.stringify(temporal)));
+      }
+    }
+  }
+
   async function abrirTemporal(id: string) {
-    const temporal = await dbLocal.get<VentaTemporal>("temporales", id);
+    const temporal = temporales.value.find((t) => t.id === id);
     if (!temporal) return;
     carrito.value = temporal.items;
-    idCliente.value = temporal.id_cliente;
-    clienteNombre.value = temporal.cliente_nombre;
+    idCliente.value = temporal.id_cliente ?? null;
+    clienteNombre.value = temporal.cliente_nombre ?? null;
     temporalActivo.value = temporal.id;
-    await dbLocal.eliminar("temporales", id);
     temporales.value = temporales.value.filter((item) => item.id !== id);
+    await dbLocal.eliminar("temporales", id);
+    if (online.value) {
+      try {
+        await api.delete(`/ventas-temporales/${id}`);
+      } catch {}
+    }
     programarBorrador();
   }
 
   async function eliminarTemporal(id: string) {
-    await dbLocal.eliminar("temporales", id);
     temporales.value = temporales.value.filter((item) => item.id !== id);
+    await dbLocal.eliminar("temporales", id);
     if (temporalActivo.value === id) temporalActivo.value = null;
+    if (online.value) {
+      try {
+        await api.delete(`/ventas-temporales/${id}`);
+      } catch {}
+    }
   }
 
   function limpiarVenta() {
@@ -423,7 +511,7 @@ export const usePOSStore = defineStore("pos", () => {
     }
 
     try {
-      const respuesta = await api.post("/ventas", payload);
+      const respuesta = await api.post("/ventas/", payload);
       limpiarVenta();
       return { ok: true, offline: false, uuid: String(respuesta.data.uuid ?? uuid) };
     } catch (error: any) {
@@ -450,7 +538,7 @@ export const usePOSStore = defineStore("pos", () => {
       const cola = await actualizarPendientes();
       for (const venta of cola) {
         try {
-          await api.post("/ventas", venta.payload);
+          await api.post("/ventas/", venta.payload);
           await dbLocal.eliminar("outbox", venta.uuid);
         } catch (error: any) {
           if (error?.response?.status === 409) {
@@ -498,12 +586,12 @@ export const usePOSStore = defineStore("pos", () => {
     eliminarProducto,
     seleccionarCliente,
     guardarTemporal,
+    actualizarTemporal,
     abrirTemporal,
     eliminarTemporal,
     limpiarVenta,
     cobrar,
     sincronizar,
-    abrirCaja,
     cargarMedios,
     cargarSesionCaja,
     cargarCatalogo,

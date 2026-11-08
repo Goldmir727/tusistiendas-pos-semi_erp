@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from celery import Celery
+from celery.schedules import crontab
 
 from app.config import get_settings
 
@@ -33,10 +34,7 @@ celery_app.conf.update(
         },
         "daily-sales-report": {
             "task": "app.tasks.report_tasks.daily_sales_report",
-            "schedule": {
-                "hour": 23,
-                "minute": 55,
-            },
+            "schedule": crontab(hour=23, minute=55),
         },
     },
 )

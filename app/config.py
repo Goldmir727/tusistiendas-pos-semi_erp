@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "pos-system"
     APP_ENV: Literal["development", "staging", "production"] = "development"
     APP_DEBUG: bool = False
+    TIMEZONE: str = "America/Bogota"
 
     SECRET_KEY: str = "CHANGE_ME_64_CHARACTERS_RANDOM"
 
@@ -62,6 +63,19 @@ class Settings(BaseSettings):
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     JWT_ALGORITHM: str = "HS256"
 
+    # --- 2FA / dispositivos confiables ---
+    AUTH_2FA_ENABLED: bool = True
+    AUTH_2FA_DEV_MODE: bool = False
+    AUTH_2FA_CODE_MINUTES: int = 10
+    DEVICE_TRUST_DAYS: int = 30
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = "no-reply@pos.local"
+    SMTP_STARTTLS: bool = True
+    SMTP_SSL: bool = False
+
     VAPID_PRIVATE_KEY_PATH: str = ""
     VAPID_PUBLIC_KEY_PATH: str = ""
     VAPID_CLAIM_EMAIL: str = "mailto:admin@tudominio.com"
@@ -80,7 +94,12 @@ class Settings(BaseSettings):
     IMPRESORA_RED_HOST: str = ""
     IMPRESORA_RED_PORT: int = 9100
 
-    CORS_ORIGINS: list[str] = ["https://pm579h8t-5173.use2.devtunnels.ms/", "http://192.168.20.26:8000"]
+    CORS_ORIGINS: list[str] = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ]
 
     @property
     def vapid_private_key(self) -> str:

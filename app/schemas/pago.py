@@ -29,6 +29,8 @@ class PagoRead(BaseModel):
     fecha_pago: datetime
     metodo_pago: MetodoPagoSueldo
     monto_total: Decimal
+    recibido_empleado: bool = False
+    fecha_recibido: datetime | None = None
     detalles: list[PagoTurnoDetalleRead] = []
 
     model_config = {"from_attributes": True}

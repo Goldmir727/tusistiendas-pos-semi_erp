@@ -21,8 +21,8 @@ async function cargarTodo() {
   try {
     const [prov, prod, comp] = await Promise.all([
       api.get("/compras/proveedores"),
-      api.get("/productos", { params: { page_size: 100 } }),
-      api.get("/compras", { params: { page_size: 50 } }),
+      api.get("/productos/", { params: { page_size: 100 } }),
+      api.get("/compras/", { params: { page_size: 50 } }),
     ]);
     proveedores.value = prov.data;
     productos.value = prod.data.items;
@@ -66,7 +66,7 @@ function agregarLinea() {
 async function guardarCompra() {
   if (!idProveedorSel.value || detalle.value.length === 0) return;
   try {
-    await api.post("/compras", {
+    await api.post("/compras/", {
       id_proveedor: idProveedorSel.value,
       id_sucursal: idSucursal.value,
       detalles: detalle.value.map((d) => ({

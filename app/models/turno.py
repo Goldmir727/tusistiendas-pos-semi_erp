@@ -15,6 +15,7 @@ from sqlalchemy import (
     Time,
     UniqueConstraint,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -48,6 +49,9 @@ class TurnoCalendario(Base):
     fecha: Mapped[date] = mapped_column(index=True)
     hora_inicio: Mapped[time] = mapped_column(Time)
     hora_fin: Mapped[time] = mapped_column(Time)
+    hora_apertura_real: Mapped[datetime | None] = mapped_column(DateTime)
+    hora_cierre_real: Mapped[datetime | None] = mapped_column(DateTime)
+    id_sesion_caja: Mapped[int | None] = mapped_column(Integer, ForeignKey("sesiones_caja.id_sesion_caja"))
     valor_total_turno: Mapped[float] = mapped_column(Numeric(12, 2))
     horas_reemplazadas_parcial: Mapped[int] = mapped_column(Integer, default=0)
     estado_turno: Mapped[EstadoTurno] = mapped_column(
@@ -71,13 +75,42 @@ class TurnoPlantilla(Base):
 
     id_plantilla: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     nombre: Mapped[str] = mapped_column(String(100))
-    dia_semana: Mapped[DiaSemana] = mapped_column(Enum(DiaSemana, name="dia_semana_enum"))
+    # Columna legada: se conserva para no romper datos existentes. Los nuevos
+    # patrones usan dias_semana y pueden dejar esta columna vacía.
+    dia_semana: Mapped[DiaSemana | None] = mapped_column(
+        Enum(DiaSemana, name="dia_semana_enum"), nullable=True
+    )
+    dias_semana: Mapped[list[int] | None] = mapped_column(JSONB)
     hora_inicio: Mapped[time] = mapped_column(Time)
     hora_fin: Mapped[time] = mapped_column(Time)
     valor_total_turno: Mapped[float] = mapped_column(Numeric(12, 2))
     id_usuario_titular: Mapped[int] = mapped_column(Integer, ForeignKey("usuarios.id_usuario"))
     activa: Mapped[bool] = mapped_column(Boolean, default=True)
+    usar_tarifa: Mapped[bool] = mapped_column(Boolean, default=True)
     id_sucursal: Mapped[int] = mapped_column(Integer, ForeignKey("sucursales.id_sucursal"))
+
+
+class TarifaTurno(Base):
+    """Regla de pago configurable por rango de horario y días de la semana."""
+
+    __tablename__ = "tarifas_turno"
+
+    id_tarifa: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nombre: Mapped[str] = mapped_column(String(120))
+    hora_inicio: Mapped[time] = mapped_column(Time)
+    hora_fin: Mapped[time] = mapped_column(Time)
+    # Días ISO: 0 = lunes ... 6 = domingo.
+    dias_semana: Mapped[list[int]] = mapped_column(JSONB, default=list)
+    valor: Mapped[float] = mapped_column(Numeric(12, 2))
+    id_sucursal: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("sucursales.id_sucursal"), nullable=True, index=True
+    )
+    prioridad: Mapped[int] = mapped_column(Integer, default=0)
+    activa: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
 
 class Festivo(Base):

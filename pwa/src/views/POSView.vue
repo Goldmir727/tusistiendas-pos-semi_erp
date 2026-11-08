@@ -18,14 +18,10 @@ const errorEscaneo = ref(false);
 
 const showPago = ref(false);
 const showCliente = ref(false);
-const showCaja = ref(false);
 const temporalAEliminar = ref<string | null>(null);
+const descripcionTemporal = ref("");
 
 const ventaFinal = ref<{ uuid: string; total: number; cambio: number; offline: boolean; mensaje?: string } | null>(null);
-
-const baseInicial = ref(0);
-const errorCaja = ref("");
-const abriendoCaja = ref(false);
 
 const busquedaCliente = ref("");
 const clientes = ref<{ id_cliente: number; nombre: string; numero_doc: string }[]>([]);
@@ -87,7 +83,8 @@ function nuevaVenta() {
 
 async function guardarTemporal() {
   if (pos.carrito.length === 0) return;
-  await pos.guardarTemporal();
+  await pos.guardarTemporal(undefined, descripcionTemporal.value || null);
+  descripcionTemporal.value = "";
   mensajeEscaneo.value = "";
   enfocar();
 }
@@ -95,6 +92,14 @@ async function guardarTemporal() {
 async function abrirTemporal(id: string) {
   await pos.abrirTemporal(id);
   enfocar();
+}
+
+function puedeEditarDescripcion(temporal: any): boolean {
+  if (!pos.sesionCaja || pos.sesionCaja.estado !== "abierta") return false;
+  const rol = auth.user?.rol;
+  if (rol === "administrador") return true;
+  const opener = pos.sesionCaja.id_usuario_abre_caja;
+  return auth.user?.id_usuario === opener || auth.user?.id_usuario === temporal.id_usuario_creador;
 }
 
 async function confirmarEliminarTemporal() {
@@ -106,7 +111,8 @@ async function confirmarEliminarTemporal() {
 function abrirModalPago() {
   if (pos.carrito.length === 0) return;
   if (!pos.sesionCaja) {
-    showCaja.value = true;
+    errorEscaneo.value = true;
+    mensajeEscaneo.value = "La caja está cerrada. Ábrela desde el módulo Caja para poder cobrar.";
     return;
   }
   pagos.value = [];
@@ -257,22 +263,6 @@ function quitarCliente() {
   pos.seleccionarCliente(null, null);
 }
 
-async function abrirCaja() {
-  if (abriendoCaja.value) return;
-  abriendoCaja.value = true;
-  errorCaja.value = "";
-  try {
-    await pos.abrirCaja(Number(baseInicial.value) || 0, auth.user?.id_sucursal ?? 1);
-    showCaja.value = false;
-    baseInicial.value = 0;
-    abrirModalPago();
-  } catch (error: any) {
-    errorCaja.value = error?.response?.data?.error?.message ?? "No se pudo abrir la caja";
-  } finally {
-    abriendoCaja.value = false;
-  }
-}
-
 onMounted(async () => {
   await pos.iniciar();
   enfocar();
@@ -294,8 +284,11 @@ onMounted(async () => {
           {{ pos.sesionCaja ? "Caja abierta" : "Caja cerrada" }}
         </span>
       </div>
-      <button v-if="!pos.sesionCaja" class="primario" @click="showCaja = true">Abrir caja</button>
     </header>
+
+    <div v-if="!pos.sesionCaja" class="aviso-caja">
+      <strong>Caja cerrada.</strong> Abre la caja desde el módulo <strong>Caja</strong> para registrar ventas.
+    </div>
 
     <div class="cuerpo">
       <section class="venta">
@@ -308,9 +301,10 @@ onMounted(async () => {
             inputmode="numeric"
             autocomplete="off"
             placeholder="Escanee el código de barras"
+            :disabled="!pos.sesionCaja"
             @keyup.enter="escanear"
           />
-          <button class="primario" @click="escanear">Agregar</button>
+          <button class="primario" :disabled="!pos.sesionCaja" @click="escanear">Agregar</button>
         </div>
         <p v-if="mensajeEscaneo" class="aviso" :class="{ error: errorEscaneo }">{{ mensajeEscaneo }}</p>
 
@@ -355,6 +349,11 @@ onMounted(async () => {
               <span class="marca">Temporal</span>
               <strong>{{ temporal.nombre }}</strong>
               <span class="muted">{{ temporal.items.length }} producto(s)</span>
+              <span v-if="temporal.descripcion" class="muted">Desc: {{ temporal.descripcion }}</span>
+            </div>
+            <div v-if="puedeEditarDescripcion(temporal)" class="temporal-desc">
+              <input v-model="temporal.descripcion" placeholder="Descripción del porqué" />
+              <button class="mini" @click="pos.actualizarTemporal(temporal.id, temporal.descripcion ?? null)">Guardar</button>
             </div>
             <div class="temporal-acciones">
               <button class="mini" @click="abrirTemporal(temporal.id)">Abrir</button>
@@ -364,10 +363,11 @@ onMounted(async () => {
         </div>
 
         <div class="acciones">
-          <button class="primario grande" :disabled="pos.carrito.length === 0" @click="abrirModalPago">
+          <button class="primario grande" :disabled="pos.carrito.length === 0 || !pos.sesionCaja" @click="abrirModalPago">
             Cobrar {{ formatear(total) }}
           </button>
-          <button class="secundario" :disabled="pos.carrito.length === 0" @click="guardarTemporal">
+          <input v-model="descripcionTemporal" placeholder="Descripción del porqué (opcional)" />
+          <button class="secundario" :disabled="pos.carrito.length === 0 || !pos.sesionCaja" @click="guardarTemporal">
             Guardar temporal
           </button>
           <button class="secundario" @click="nuevaVenta">Nueva venta</button>
@@ -464,22 +464,6 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- Abrir caja -->
-    <div v-if="showCaja" class="overlay" @click.self="showCaja = false">
-      <div class="modal">
-        <h2>Abrir caja</h2>
-        <label>
-          Base inicial en efectivo
-          <input v-model.number="baseInicial" type="number" min="0" />
-        </label>
-        <p v-if="errorCaja" class="aviso error">{{ errorCaja }}</p>
-        <div class="modal-acciones">
-          <button class="secundario" @click="showCaja = false">Cancelar</button>
-          <button class="primario" :disabled="abriendoCaja" @click="abrirCaja">Abrir</button>
-        </div>
-      </div>
-    </div>
-
     <!-- Confirmar eliminación de temporal -->
     <div v-if="temporalAEliminar" class="overlay" @click.self="temporalAEliminar = null">
       <div class="modal">
@@ -497,6 +481,7 @@ onMounted(async () => {
 <style scoped>
 .pos { min-height: 100vh; display: flex; flex-direction: column; }
 .barra { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.aviso-caja { margin: 16px 16px 0; padding: 12px 16px; border: 1px solid var(--warning); border-radius: 8px; background: rgba(243, 156, 18, 0.08); color: var(--warning); font-size: 14px; }
 .estado { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; }
 .etiqueta { font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border); }
 .etiqueta.ok { color: var(--success); border-color: var(--success); }

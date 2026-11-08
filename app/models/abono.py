@@ -17,7 +17,12 @@ class AbonoCliente(Base):
     id_usuario: Mapped[int] = mapped_column(Integer, ForeignKey("usuarios.id_usuario"))
     monto: Mapped[float] = mapped_column(Numeric(12, 2))
     tipo: Mapped[str] = mapped_column(String(20), default="abono")
+    # Solo el abono en efectivo suma al efectivo esperado de la caja (RN-03).
+    metodo: Mapped[str] = mapped_column(String(20), default="efectivo")
+    id_sesion_caja: Mapped[int | None] = mapped_column(Integer, ForeignKey("sesiones_caja.id_sesion_caja"))
     fecha: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     observacion: Mapped[str | None] = mapped_column(String(300))
+
+    id_sucursal: Mapped[int | None] = mapped_column(Integer, ForeignKey("sucursales.id_sucursal"))
 
     venta: Mapped["Venta | None"] = relationship()

@@ -32,6 +32,8 @@ class Devolucion(Base):
     id_usuario_aprueba: Mapped[int | None] = mapped_column(Integer, ForeignKey("usuarios.id_usuario"))
     motivo: Mapped[str | None] = mapped_column(String(500))
     monto: Mapped[float] = mapped_column(Numeric(12, 2))
+    # efectivo | transferencia | nota_credito. Solo el efectivo sale de la caja.
+    metodo_reembolso: Mapped[str] = mapped_column(String(20), default="efectivo")
     estado: Mapped[EstadoDevolucion] = mapped_column(
         Enum(EstadoDevolucion, name="estado_devolucion_enum"),
         default=EstadoDevolucion.pendiente_aprobacion,

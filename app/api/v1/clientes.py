@@ -174,5 +174,7 @@ async def create_abono(
         monto=body.monto,
         id_usuario=current_user.id_usuario,
         observacion=body.observacion,
+        metodo=body.metodo,
+        id_sesion_caja=body.id_sesion_caja,
     )
     return AbonoRead.model_validate(abono)

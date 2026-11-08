@@ -1,9 +1,9 @@
 from datetime import datetime, timedelta
 from hashlib import sha256
 
+import bcrypt
 from fastapi import Header
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,15 +13,24 @@ from app.models.usuario import Permiso, RolPermiso, Usuario
 from app.schemas.usuario import UsuarioCreate
 
 settings = get_settings()
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+def _bytes_contrasena(password: str) -> bytes:
+    # bcrypt solo considera los primeros 72 bytes del secreto.
+    return password.encode("utf-8")[:72]
 
 
 def hash_contrasena(password: str) -> str:
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(_bytes_contrasena(password), bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_contrasena(password: str, hashed: str) -> bool:
-    return pwd_context.verify(password, hashed)
+    if not hashed:
+        return False
+    try:
+        return bcrypt.checkpw(_bytes_contrasena(password), hashed.encode("utf-8"))
+    except ValueError:
+        return False
 
 
 def hash_token(token: str) -> str:
@@ -98,6 +107,51 @@ async def get_current_admin(authorization: str | None = Header(None)) -> Usuario
     return user
 
 
+async def get_current_cajero(authorization: str | None = Header(None)) -> Usuario:
+    from app.models.usuario import RolEnum
+
+    user = await get_current_user(authorization)
+    if user.rol not in (RolEnum.cajero, RolEnum.administrador):
+        raise AuthorizationError("Se requiere rol de caja")
+    return user
+
+
+async def get_current_empleado(authorization: str | None = Header(None)) -> Usuario:
+    from app.models.usuario import RolEnum
+
+    user = await get_current_user(authorization)
+    if user.rol not in (RolEnum.empleado, RolEnum.administrador):
+        raise AuthorizationError("Se requiere rol de empleado")
+    return user
+
+
+async def get_current_turnos_actor(authorization: str | None = Header(None)) -> Usuario:
+    from app.models.usuario import RolEnum
+
+    user = await get_current_user(authorization)
+    if user.rol not in (RolEnum.cajero, RolEnum.empleado, RolEnum.administrador):
+        raise AuthorizationError("No tiene permiso para acceder a turnos")
+    return user
+
+
+async def get_current_cajero(authorization: str | None = Header(None)) -> Usuario:
+    from app.models.usuario import RolEnum
+
+    user = await get_current_user(authorization)
+    if user.rol not in (RolEnum.administrador, RolEnum.cajero):
+        raise AuthorizationError("Se requiere rol de caja")
+    return user
+
+
+async def get_current_empleado(authorization: str | None = Header(None)) -> Usuario:
+    from app.models.usuario import RolEnum
+
+    user = await get_current_user(authorization)
+    if user.rol not in (RolEnum.administrador, RolEnum.empleado):
+        raise AuthorizationError("Se requiere rol de empleado")
+    return user
+
+
 async def get_current_user_optional(authorization: str | None = Header(None)) -> Usuario | None:
     if not authorization or not authorization.startswith("Bearer "):
         return None
@@ -119,7 +173,33 @@ async def create_usuario(db: AsyncSession, data: UsuarioCreate) -> Usuario:
         banco_nombre=data.banco_nombre,
         banco_numero_cuenta=data.banco_numero_cuenta,
         id_sucursal=data.id_sucursal,
+        id_punto_venta=data.id_punto_venta,
     )
     db.add(usuario)
     await db.flush()
     return usuario
+
+
+def generar_codigo_verificacion() -> str:
+    import secrets
+
+    return f"{secrets.randbelow(1000000):06d}"
+
+
+def hash_codigo(challenge_id: str, codigo: str) -> str:
+    from hashlib import sha256
+
+    return sha256(f"{challenge_id}:{codigo}".encode()).hexdigest()
+
+
+def hash_codigo(challenge_id: str, codigo: str) -> str:
+    return sha256(f"{challenge_id}:{codigo}".encode()).hexdigest()
+
+
+def enmascarar_email(email: str) -> str:
+    if "@" not in email:
+        return "***"
+    local, dominio = email.split("@", 1)
+    if len(local) <= 1:
+        return f"*@{dominio}"
+    return f"{local[0]}{'*' * (len(local) - 1)}@{dominio}"

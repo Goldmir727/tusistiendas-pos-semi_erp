@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -44,6 +45,8 @@ class AbonoCreate(BaseModel):
     id_cliente: int
     id_venta: int | None = None
     monto: float
+    metodo: Literal["efectivo", "transferencia"] = "efectivo"
+    id_sesion_caja: int | None = None
     observacion: str | None = None
 
 
@@ -53,6 +56,8 @@ class AbonoRead(BaseModel):
     id_venta: int | None = None
     monto: float
     tipo: str
+    metodo: str = "efectivo"
+    id_sesion_caja: int | None = None
     fecha: datetime
     observacion: str | None = None
 

@@ -1,4 +1,6 @@
 from app.models.usuario import (
+    CodigoVerificacion,
+    DispositivoConfiable,
     Permiso,
     RolPermiso,
     SesionUsuario,
@@ -9,6 +11,7 @@ from app.models.turno import (
     DispositivoUsuario,
     Festivo,
     Notificacion,
+    TarifaTurno,
     TurnoCalendario,
     TurnoPlantilla,
 )
@@ -24,6 +27,7 @@ from app.models.compra import Compra, CompraDetalle, Proveedor
 from app.models.devolucion import Devolucion, DevolucionDetalle
 from app.models.egreso import Egreso
 from app.models.abono import AbonoCliente
+from app.models.venta_temporal import VentaTemporal
 
 __all__ = [
     "Usuario",
@@ -35,6 +39,7 @@ __all__ = [
     "MovimientoStock",
     "TurnoCalendario",
     "TurnoPlantilla",
+    "TarifaTurno",
     "Festivo",
     "DispositivoUsuario",
     "Notificacion",
@@ -63,4 +68,7 @@ __all__ = [
     "DevolucionDetalle",
     "Egreso",
     "AbonoCliente",
+    "VentaTemporal",
+    "DispositivoConfiable",
+    "CodigoVerificacion",
 ]

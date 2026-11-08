@@ -12,7 +12,7 @@ async function cargar() {
   loading.value = true;
   try {
     const [egr, caja] = await Promise.all([
-      api.get("/egresos"),
+      api.get("/egresos/"),
       api.get("/caja/abierta"),
     ]);
     egresos.value = egr.data;
@@ -25,9 +25,9 @@ async function cargar() {
 async function guardar() {
   if (!nuevo.value.descripcion || nuevo.value.monto <= 0) return;
   try {
-    await api.post("/egresos", {
+    await api.post("/egresos/", {
       id_sesion_caja: nuevo.value.id_sesion_caja,
-      id_sucursal: 1,
+      id_sucursal: sesion.value?.id_sucursal ?? 1,
       categoria: nuevo.value.categoria,
       descripcion: nuevo.value.descripcion,
       monto: nuevo.value.monto,

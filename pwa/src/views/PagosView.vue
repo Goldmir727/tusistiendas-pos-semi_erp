@@ -1,18 +1,56 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted, computed, watch } from "vue";
 import api from "../api/client";
+import { useAuthStore } from "../stores/auth";
 
+const authStore = useAuthStore();
 const turnosPendientes = ref<any[]>([]);
+const misPagos = ref<any[]>([]);
+const empleados = ref<any[]>([]);
+const empleadoSel = ref<number | null>(null);
 const selected = ref<Set<number>>(new Set());
 const loading = ref(true);
 
-onMounted(async () => {
+const esAdmin = computed(() => authStore.user?.rol === "administrador");
+
+async function cargarMisPagos() {
   try {
-    const response = await api.get("/pagos/turnos-pendientes");
-    turnosPendientes.value = response.data;
-  } catch {} finally {
-    loading.value = false;
+    const resp = await api.get("/pagos/mis-pagos");
+    misPagos.value = resp.data || [];
+  } catch {}
+}
+
+async function cargarEmpleados() {
+  if (!esAdmin.value) return;
+  try {
+    const resp = await api.get("/usuarios/", { params: { rol: "empleado", page_size: 100 } });
+    empleados.value = resp.data?.items || [];
+  } catch {}
+}
+
+async function cargarPendientes() {
+  try {
+    const params: any = {};
+    if (esAdmin.value && empleadoSel.value) params.id_usuario = empleadoSel.value;
+    const response = await api.get("/pagos/turnos-pendientes", { params });
+    turnosPendientes.value = response.data || [];
+  } catch {}
+}
+
+async function marcarRecibido(idPago: number) {
+  try {
+    await api.patch(`/pagos/${idPago}/marcar-recibido`);
+    await cargarMisPagos();
+  } catch (e: any) {
+    alert(e.response?.data?.error?.message || "Error");
   }
+}
+
+onMounted(async () => {
+  await cargarEmpleados();
+  await cargarPendientes();
+  await cargarMisPagos();
+  loading.value = false;
 });
 
 const totalSeleccionado = computed(() =>
@@ -27,21 +65,25 @@ function toggle(id: number) {
 }
 
 async function procesarPago(metodo: string) {
-  if (selected.value.size === 0) return;
+  if (selected.value.size === 0 || !empleadoSel.value) return;
   try {
     await api.post("/pagos/", {
-      id_usuario_receptor: 0,
+      id_usuario_receptor: empleadoSel.value,
       metodo_pago: metodo,
       turnos_ids: Array.from(selected.value),
     });
     alert("Pago procesado");
     selected.value.clear();
-    const response = await api.get("/pagos/turnos-pendientes");
-    turnosPendientes.value = response.data;
+    await cargarPendientes();
   } catch (e: any) {
     alert(e.response?.data?.error?.message || "Error");
   }
 }
+
+watch(empleadoSel, () => {
+  selected.value.clear();
+  cargarPendientes();
+});
 </script>
 
 <template>
@@ -52,16 +94,38 @@ async function procesarPago(metodo: string) {
     </header>
     <div v-if="loading" class="loading">Cargando...</div>
     <div v-else>
+      <div class="card" style="margin-bottom: 16px;">
+        <h3>Mis pagos recibidos</h3>
+        <div v-if="misPagos.length === 0" class="muted">No tienes pagos registrados</div>
+        <div v-for="pago in misPagos" :key="pago.id_pago" class="turno-row">
+          <div class="turno-info">
+            <span>{{ new Date(pago.fecha_pago).toLocaleDateString() }} - ${{ Number(pago.monto_total).toLocaleString() }}</span>
+            <span :class="pago.recibido_empleado ? 'ok' : 'negative'">
+              {{ pago.recibido_empleado ? 'Recibido' : 'Pendiente' }}
+            </span>
+          </div>
+          <button v-if="!pago.recibido_empleado" class="primary" @click="marcarRecibido(pago.id_pago)">Marcar recibido</button>
+        </div>
+      </div>
+      <div v-if="esAdmin" class="card" style="margin-bottom: 16px;">
+        <label>Empleado</label>
+        <select v-model.number="empleadoSel">
+          <option :value="null">Seleccione empleado</option>
+          <option v-for="e in empleados" :key="e.id_usuario" :value="e.id_usuario">
+            {{ e.nombre_completo }}
+          </option>
+        </select>
+      </div>
       <div v-if="turnosPendientes.length === 0" class="empty">No hay turnos pendientes por cobrar</div>
       <div v-else>
-        <div v-for="turno in turnosPendientes" :key="turno.id_turno" class="turno-row card" @click="toggle(turno.id_turno)">
-          <input type="checkbox" :checked="selected.has(turno.id_turno)" />
+        <div v-for="turno in turnosPendientes" :key="turno.id_turno" class="turno-row card" @click="esAdmin ? toggle(turno.id_turno) : null">
+          <input v-if="esAdmin" type="checkbox" :checked="selected.has(turno.id_turno)" />
           <div class="turno-info">
             <span>{{ turno.fecha }} | {{ turno.hora_inicio }} - {{ turno.hora_fin }}</span>
             <span class="turno-valor">${{ turno.valor_total_turno.toLocaleString() }}</span>
           </div>
         </div>
-        <div class="payment-bar">
+        <div v-if="esAdmin" class="payment-bar">
           <span class="total-label">Seleccionados: {{ selected.size }} | Total: ${{ totalSeleccionado.toLocaleString() }}</span>
           <div class="payment-actions">
             <button @click="procesarPago('efectivo')" class="primary">Efectivo</button>

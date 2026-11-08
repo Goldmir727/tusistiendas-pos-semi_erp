@@ -22,6 +22,7 @@ from app.database import Base
 class RolEnum(str, enum.Enum):
     administrador = "administrador"
     cajero = "cajero"
+    empleado = "empleado"
 
 
 class Usuario(Base):
@@ -37,6 +38,8 @@ class Usuario(Base):
     banco_nombre: Mapped[str | None] = mapped_column(String(50))
     banco_numero_cuenta: Mapped[str | None] = mapped_column(String(30))
     activo: Mapped[bool] = mapped_column(Boolean, default=True)
+    auth_2fa_habilitado: Mapped[bool] = mapped_column(Boolean, default=False)
+    id_punto_venta: Mapped[int | None] = mapped_column(Integer, ForeignKey("puntos_venta.id_punto_venta"), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -50,6 +53,9 @@ class Usuario(Base):
         back_populates="usuarios",
     )
     sesiones: Mapped[list["SesionUsuario"]] = relationship(back_populates="usuario")
+    dispositivos_confiables: Mapped[list["DispositivoConfiable"]] = relationship(
+        back_populates="usuario", cascade="all, delete-orphan"
+    )
     turnos_titular: Mapped[list["TurnoCalendario"]] = relationship(
         foreign_keys="[TurnoCalendario.id_usuario_titular]", back_populates="titular"
     )
@@ -97,3 +103,35 @@ class SesionUsuario(Base):
     revocado_en: Mapped[datetime | None] = mapped_column(DateTime)
 
     usuario: Mapped[Usuario] = relationship(back_populates="sesiones")
+
+
+class DispositivoConfiable(Base):
+    __tablename__ = "dispositivos_confiables"
+
+    id_dispositivo: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id_usuario: Mapped[int] = mapped_column(Integer, ForeignKey("usuarios.id_usuario"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    nombre: Mapped[str | None] = mapped_column(String(120))
+    user_agent: Mapped[str | None] = mapped_column(Text)
+    ip: Mapped[str | None] = mapped_column(String(45))
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    ultimo_uso: Mapped[datetime | None] = mapped_column(DateTime)
+    expira_en: Mapped[datetime] = mapped_column(DateTime)
+    revocado_en: Mapped[datetime | None] = mapped_column(DateTime)
+
+    usuario: Mapped["Usuario"] = relationship(back_populates="dispositivos_confiables")
+
+
+class CodigoVerificacion(Base):
+    __tablename__ = "codigos_verificacion"
+
+    id_codigo: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id_usuario: Mapped[int] = mapped_column(Integer, ForeignKey("usuarios.id_usuario"), index=True)
+    codigo_hash: Mapped[str] = mapped_column(String(128))
+    challenge_hash: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    expira_en: Mapped[datetime] = mapped_column(DateTime)
+    usado: Mapped[bool] = mapped_column(Boolean, default=False)
+    intentos: Mapped[int] = mapped_column(Integer, default=0)
+    reenvios: Mapped[int] = mapped_column(Integer, default=0)
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    ultimo_envio: Mapped[datetime | None] = mapped_column(DateTime)

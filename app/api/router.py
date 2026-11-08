@@ -15,6 +15,7 @@ from app.api.v1 import (
     compras,
     devoluciones,
     egresos,
+    ventas_temporales,
 )
 
 api_router = APIRouter()
@@ -33,3 +34,4 @@ api_router.include_router(clientes.router, prefix="/clientes", tags=["Clientes"]
 api_router.include_router(compras.router, prefix="/compras", tags=["Compras"])
 api_router.include_router(devoluciones.router, prefix="/devoluciones", tags=["Devoluciones"])
 api_router.include_router(egresos.router, prefix="/egresos", tags=["Egresos"])
+api_router.include_router(ventas_temporales.router, prefix="/ventas-temporales", tags=["Ventas Temporales"])

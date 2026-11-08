@@ -5,7 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.exceptions import NotFoundError
+from app.exceptions import AuthorizationError, NotFoundError
 from app.models.usuario import Usuario
 from app.schemas.common import PaginatedResponse
 from app.schemas.usuario import UsuarioCreate, UsuarioRead, UsuarioUpdate
@@ -13,6 +13,7 @@ from app.services.auth_service import (
     create_usuario,
     get_current_user,
     get_current_admin,
+    get_current_cajero,
 )
 
 router = APIRouter()
@@ -28,12 +29,17 @@ async def get_me(
 @router.get("/", response_model=None)
 async def list_usuarios(
     db: Annotated[AsyncSession, Depends(get_db)],
-    _current: Annotated[object, Depends(get_current_admin)],
+    current_user: Annotated[Usuario, Depends(get_current_user)],
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     rol: str | None = None,
     id_sucursal: int | None = None,
 ) -> PaginatedResponse[UsuarioRead]:
+    from app.models.usuario import RolEnum
+
+    if current_user.rol != RolEnum.administrador:
+        if not (current_user.rol == RolEnum.cajero and rol == "empleado"):
+            raise AuthorizationError("No tiene permisos para listar usuarios")
     query = select(Usuario)
     count_query = select(func.count()).select_from(Usuario)
 

@@ -12,7 +12,7 @@ Multi-sucursal POS con Facturación Electrónica DIAN, Workforce Management y Li
 - **Backend:** Python 3.11 + FastAPI + SQLAlchemy 2.0 (async) + Celery
 - **Database:** PostgreSQL 16 + Redis 7
 - **Frontend:** Vue 3 + TypeScript + Pinia + Vite (PWA)
-- **Deploy:** Docker Compose + Hostinger VPS + Caddy (auto-HTTPS)
+- **Deploy:** Docker Compose + Hostinger VPS(o cualquier deployer como vercel) + Caddy (auto-HTTPS)
 
 ## Quick Start (Development)
 

@@ -16,6 +16,7 @@ class UsuarioBase(BaseModel):
     banco_nombre: str | None = None
     banco_numero_cuenta: str | None = None
     id_sucursal: int | None = None
+    id_punto_venta: int | None = None
 
 
 class UsuarioCreate(UsuarioBase):
@@ -30,11 +31,13 @@ class UsuarioUpdate(BaseModel):
     banco_numero_cuenta: str | None = None
     activo: bool | None = None
     id_sucursal: int | None = None
+    id_punto_venta: int | None = None
 
 
 class UsuarioRead(UsuarioBase):
     id_usuario: int
     activo: bool
+    auth_2fa_habilitado: bool = False
     created_at: datetime
 
     model_config = {"from_attributes": True}
